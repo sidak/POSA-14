@@ -6,6 +6,8 @@ import java.util.concurrent.Executors;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Messenger;
@@ -34,7 +36,7 @@ public class ThreadPoolDownloadService extends Service {
      * used to service download requests.
      */
     static final int MAX_THREADS = 4;
-	
+
     /**
      * The ExecutorService that references a ThreadPool.
      */
@@ -49,7 +51,7 @@ public class ThreadPoolDownloadService extends Service {
         // FixedThreadPool Executor that's configured to use
         // MAX_THREADS. Use a factory method in the Executors class.
 
-        mExecutor = null;
+        mExecutor = Executors.newFixedThreadPool(MAX_THREADS);
     }
 
     /**
@@ -73,8 +75,11 @@ public class ThreadPoolDownloadService extends Service {
     	// TODO - You fill in here, by replacing null with an
         // invocation of the appropriate factory method in
         // DownloadUtils that makes a MessengerIntent.
-
-        return null;
+        return DownloadUtils.makeMessengerIntent(context,
+                ThreadPoolDownloadService.class,
+                handler,
+                uri
+                );
     }
 
     /**
@@ -93,10 +98,23 @@ public class ThreadPoolDownloadService extends Service {
         // the uri in the intent and returns the file's pathname using
         // a Messenger who's Bundle key is defined by DownloadUtils.MESSENGER_KEY.
 
-        Runnable downloadRunnable = null;
+        Bundle bundle = intent.getExtras();
+        if (bundle != null) {
 
-        mExecutor.execute(downloadRunnable);
-      
+            final Context context = this;
+            final Uri uri = intent.getData();
+            final Messenger messenger = (Messenger) bundle.get(DownloadUtils.MESSENGER_KEY);
+
+            Runnable downloadRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    DownloadUtils.downloadAndRespond(context, uri, messenger);
+                }
+            };
+
+            mExecutor.execute(downloadRunnable);
+        }
+
         // Tell the Android framework how to behave if this service is
         // interrupted.  In our case, we want to restart the service
         // then re-deliver the intent so that all files are eventually
